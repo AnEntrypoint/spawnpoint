@@ -1,6 +1,6 @@
 export default {
   port: 3000,
-  tickRate: 128,
+  tickRate: 60,
   gravity: [0, -9.81, 0],
   movement: {
     maxSpeed: 4.0,
