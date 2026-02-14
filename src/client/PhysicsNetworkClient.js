@@ -21,6 +21,7 @@ export class PhysicsNetworkClient {
     this._reconnecting = false
     this._maxReconnectDelay = 5000
     this._destroyed = false
+    this._kalmanConfig = null
     this.callbacks = {
       onConnect: config.onConnect || (() => {}),
       onDisconnect: config.onDisconnect || (() => {}),
@@ -133,14 +134,14 @@ export class PhysicsNetworkClient {
       this.playerId = payload.playerId
       this.currentTick = payload.tick
       if (payload.sessionToken) this._sessionToken = payload.sessionToken
-      this._predEngine = new PredictionEngine(this.config.tickRate)
+      this._predEngine = new PredictionEngine(this.config.tickRate, this._kalmanConfig)
       this._predEngine.init(this.playerId)
     } else if (type === MSG.RECONNECT_ACK) {
       this.playerId = payload.playerId
       this.currentTick = payload.tick
       if (payload.sessionToken) this._sessionToken = payload.sessionToken
       if (!this._predEngine) {
-        this._predEngine = new PredictionEngine(this.config.tickRate)
+        this._predEngine = new PredictionEngine(this.config.tickRate, this._kalmanConfig)
         this._predEngine.init(this.playerId)
       }
     } else if (type === MSG.STATE_RECOVERY) {
@@ -156,6 +157,7 @@ export class PhysicsNetworkClient {
       this._playerStates.delete(payload.playerId)
       this.callbacks.onPlayerLeft(payload.playerId)
     } else if (type === MSG.WORLD_DEF) {
+      if (payload.kalman) this._kalmanConfig = payload.kalman
       if (payload.movement && this._predEngine) this._predEngine.setMovement(payload.movement)
       if (payload.gravity && this._predEngine) this._predEngine.setGravity(payload.gravity)
       this.callbacks.onWorldDef?.(payload)

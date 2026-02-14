@@ -5,7 +5,7 @@ import { createKalmanFilterX, createKalmanFilterY, createKalmanFilterZ,
          createKalmanFilterRotation } from '../util/KalmanFilterFactory.js'
 
 export class PredictionEngine {
-  constructor(tickRate = 60) {
+  constructor(tickRate = 60, kalmanConfig = {}) {
     this.tickRate = tickRate
     this.tickDuration = 1000 / tickRate
     this.localPlayerId = null
@@ -15,14 +15,16 @@ export class PredictionEngine {
     this.reconciliationEngine = new ReconciliationEngine()
     this.movement = { ...DEFAULT_MOVEMENT }
     this.gravityY = -9.81
+
+    const cfg = kalmanConfig || {}
     this.kalmanFilters = {
-      posX: createKalmanFilterX(),
-      posY: createKalmanFilterY(),
-      posZ: createKalmanFilterZ(),
-      velX: createKalmanFilterVelX(),
-      velY: createKalmanFilterVelY(),
-      velZ: createKalmanFilterVelZ(),
-      rotation: createKalmanFilterRotation()
+      posX: createKalmanFilterX(cfg.posQ, cfg.posR),
+      posY: createKalmanFilterY(cfg.posQY, cfg.posR),
+      posZ: createKalmanFilterZ(cfg.posQ, cfg.posR),
+      velX: createKalmanFilterVelX(cfg.velQ, cfg.velR),
+      velY: createKalmanFilterVelY(cfg.velQY, cfg.velR),
+      velZ: createKalmanFilterVelZ(cfg.velQ, cfg.velR),
+      rotation: createKalmanFilterRotation(cfg.rotQ, cfg.rotR)
     }
   }
 
@@ -84,31 +86,6 @@ export class PredictionEngine {
       state.velocity[1] = 0
       state.onGround = true
     }
-  }
-
-  interpolate(factor) {
-    if (!this.lastServerState || !this.localState) return this.localState
-    return {
-      id: this.localState.id,
-      position: [
-        this.lastServerState.position[0] + (this.localState.position[0] - this.lastServerState.position[0]) * factor,
-        this.lastServerState.position[1] + (this.localState.position[1] - this.lastServerState.position[1]) * factor,
-        this.lastServerState.position[2] + (this.localState.position[2] - this.lastServerState.position[2]) * factor
-      ],
-      rotation: this.localState.rotation,
-      velocity: this.localState.velocity,
-      health: this.localState.health,
-      onGround: this.localState.onGround
-    }
-  }
-
-  extrapolate(ticksAhead = 1) {
-    const extrapolated = JSON.parse(JSON.stringify(this.localState))
-    const dt = (this.tickDuration / 1000) * ticksAhead
-    extrapolated.position[0] += this.localState.velocity[0] * dt
-    extrapolated.position[1] += this.localState.velocity[1] * dt
-    extrapolated.position[2] += this.localState.velocity[2] * dt
-    return extrapolated
   }
 
   onServerSnapshot(snapshot, tick) {

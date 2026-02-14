@@ -57,6 +57,16 @@ export default {
     sprintTimeScale: 0.56,
     fadeTime: 0.15
   },
+  kalman: {
+    posQ: 0.01,
+    posQY: 0.02,
+    posR: 0.001,
+    velQ: 0.05,
+    velQY: 0.1,
+    velR: 0.002,
+    rotQ: 0.1,
+    rotR: 0.01
+  },
   entities: [
     { id: 'environment', model: './apps/tps-game/schwust.glb', position: [0, 0, 0], app: 'environment' },
     { id: 'game', position: [0, 0, 0], app: 'tps-game' },
