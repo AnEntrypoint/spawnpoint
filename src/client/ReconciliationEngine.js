@@ -1,9 +1,10 @@
 export class ReconciliationEngine {
   constructor(config = {}) {
-    this.correctionThreshold = config.correctionThreshold || 0.01
+    this.correctionThreshold = config.correctionThreshold || 0.5
     this.correctionSpeed = config.correctionSpeed || 0.5
     this.lastReconcileTime = 0
     this.reconcileInterval = config.reconcileInterval || 100
+    this.majorDivergenceThreshold = config.majorDivergenceThreshold || 1.0
   }
 
   reconcile(serverState, localState, tick) {
@@ -21,7 +22,8 @@ export class ReconciliationEngine {
     }
 
     const correction = this.generateCorrection(serverState, localState)
-    return { needsCorrection: true, correction, divergence }
+    const isMajor = divergence >= this.majorDivergenceThreshold
+    return { needsCorrection: true, correction, divergence, isMajor }
   }
 
   calculateDivergence(serverState, localState) {

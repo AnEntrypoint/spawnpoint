@@ -4,7 +4,7 @@ import { MSG } from '../protocol/MessageTypes.js'
 
 export class PhysicsNetworkClient {
   constructor(config = {}) {
-    this.config = { url: config.url || 'ws://localhost:3000/ws', tickRate: config.tickRate || 128, predictionEnabled: config.predictionEnabled !== false, debug: config.debug || false, ...config }
+    this.config = { url: config.url || 'ws://localhost:3000/ws', tickRate: config.tickRate || 60, predictionEnabled: config.predictionEnabled !== false, debug: config.debug || false, ...config }
     this.ws = null
     this.playerId = null
     this.connected = false
@@ -220,7 +220,8 @@ export class PhysicsNetworkClient {
   _render() {
     const displayStates = new Map()
     for (const [playerId, serverState] of this._playerStates) {
-      displayStates.set(playerId, playerId === this.playerId && this.config.predictionEnabled && this._predEngine ? this._predEngine.getDisplayState(this.currentTick, 0) : serverState)
+      const displayState = playerId === this.playerId && this.config.predictionEnabled && this._predEngine ? this._predEngine.getDisplayState(this.currentTick, 0) : serverState
+      displayStates.set(playerId, displayState)
     }
     this.callbacks.onRender(displayStates)
   }
