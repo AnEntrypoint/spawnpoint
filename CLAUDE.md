@@ -201,3 +201,29 @@ If/when mobile is prioritized:
 
 ### Rationale
 The 80/20 rule: joystick + jump + shoot = 80% of "playable on mobile" with 20% effort. Everything else is diminishing returns against desktop polish.
+
+## TickSystem 60 TPS Behavior
+
+TickSystem (src/netcode/TickSystem.js) is rate-agnostic and works correctly at 60 TPS. Key behaviors:
+
+**Configuration at 60 TPS:**
+- tickRate: 60
+- tickDuration: 1000 / 60 = 16.667ms per tick
+- maxSteps: 4 (recovery window: 66.7ms vs 31.25ms at 128 TPS)
+
+**Tick Interval Guarantee (Line 34):**
+`this.lastTickTime += this.tickDuration` ensures each tick advances exactly 16.67ms. While condition `elapsed >= this.tickDuration` guarantees no tick fires before interval elapsed. Callbacks receive precise dt = 0.01667 seconds.
+
+**Expected Interval at 60 TPS:** 16.67ms ± 2ms (variance from setTimeout granularity and event loop latency)
+
+**Recovery Mechanism (Lines 46-48):**
+If server falls >66.7ms behind, silently reset `lastTickTime = now` to drop backlog and prevent catch-up cascade. At 60 TPS this window is 2.14x longer than 128 TPS (absolute milliseconds), making recovery more robust.
+
+**Scheduling Strategy (Lines 49-51):**
+Gap calculation uses `tickDuration - elapsed` to determine next reschedule timing. At 60 TPS gap is typically ~14-16ms, so `setTimeout(loop, 1)` is used almost always. Strategy is rate-agnostic and works identically at any tick rate.
+
+**No Hardcoded Assumptions:**
+TickSystem contains zero hardcoded 128 TPS values. All calculations use `this.tickRate` and `this.tickDuration` parameters. Framework scales linearly to any tick rate.
+
+**Test Verification:**
+File `test-tick-60tps-inline.mjs` verifies 60 TPS behavior by capturing timestamps over 10 seconds. Expected: 600 ticks with average interval 16.67ms ± 2ms, zero crashes, zero warnings.
