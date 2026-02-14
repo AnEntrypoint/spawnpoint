@@ -170,6 +170,71 @@ Scoped subscriptions auto-cleanup on entity destroy/hot reload.
 - `webjsx` - JSX-like DOM diffing for client UI
 - `d3-octree` - Spatial indexing
 
+## Testing
+
+### W4-024: Player-Player Collision Test (60 TPS)
+
+Validates custom player-player collision detection at 60 TPS.
+
+```bash
+node test-w4-024-final.mjs
+```
+
+**Setup:**
+- Player A spawns at [0, 0, 0], walks right (+X)
+- Player B spawns at [3, 0, 0], walks left (-X)
+- Both accelerate toward each other at ~2.0 m/s
+- Expected collision at ~0.75 seconds
+
+**System Under Test:**
+- `src/sdk/TickHandler.js` lines 64-88: Collision separation loop
+- `src/netcode/PhysicsIntegration.js` lines 97-118: Distance-based detection
+
+**Collision Parameters:**
+- Capsule radius: 0.4 units per player
+- Min collision distance: 0.8 units (2 × radius)
+- Separation: 50% overlap per player
+- Max separation velocity: 3.0 m/s
+
+**Acceptance Criteria (all must pass):**
+1. Collision detected at correct distance (< 0.8 units)
+2. Time to collision reasonable (0.55 - 0.95 seconds)
+3. Separation response active (max penetration < 0.2 units)
+4. No excessive oscillation (< 5 transitions)
+5. Both players remain stable (onGround = true)
+6. Collision threshold respected
+
+**Test Files:**
+- `test-w4-024-final.mjs` - Main collision test (recommended)
+- `test-w4-024-sim.mjs` - Alternative with physics simulation
+- `test-w4-024.mjs` - Basic version
+- `apps/collision-test/index.js` - Test app for browser-based testing
+
+**Output Example:**
+```
+[W4-024] Player-Player Collision Test at 60 TPS
+======================================================================
+[COLLISION] Detected at frame 45 (t=0.750s) distance=0.798u
+[VALIDATION]
+============
+[PASS] Collision detected
+[PASS] At correct distance (< 0.8u)
+[PASS] Time reasonable (0.55-0.95s)
+[PASS] Low penetration (< 0.2u)
+[PASS] No excessive collision (<50% time)
+
+======================================================================
+OVERALL: PASS
+======================================================================
+```
+
+**Physics Notes:**
+- Movement: Quake-style friction + air acceleration
+- Y velocity: from gravity/physics
+- XZ velocity: from input (capped at maxSpeed = 4.0 m/s)
+- Collision runs AFTER physics.step() to separate penetrating players
+- Separated Set prevents double-processing same pair
+
 ## License
 
 MIT

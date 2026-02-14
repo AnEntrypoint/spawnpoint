@@ -1,0 +1,128 @@
+
+60 TPS + KALMAN FILTER OPTIMIZATION PRD SUMMARY
+===============================================
+
+FILE LOCATION: C:\dev\devbox\spawnpoint\.prd
+
+PROJECT SCOPE
+=============
+- Migrate server from 128 TPS to 60 TPS (7.8ms → 16.67ms per tick)
+- Reduce network bandwidth by ~53% (fewer snapshots)
+- Implement client-side Kalman filters for smooth prediction
+- Maintain identical game feel (physics, movement, jumping, collision)
+- Keep rendering at unlimited FPS (decoupled from tick rate)
+
+EXECUTION PLAN
+==============
+30 total work items organized in 5 waves
+
+WAVE 1 (7 items - PARALLEL): Kalman utilities
+  - W1-001: KalmanFilter1D class (1D position/velocity filtering)
+  - W1-002: KalmanFilterQuaternion class (rotation filtering, no gimbal lock)
+  - W1-003: Update world config tickRate to 60
+  - W1-004: Kalman factory for X-axis (process noise 0.01, measurement noise 0.001)
+  - W1-005: Kalman factory for Y-axis (higher Q for gravity: 0.02)
+  - W1-006: Kalman factory for Z-axis (same as X)
+  - W1-007: Kalman factory for rotation (angular acceleration: 0.1 rad/s²)
+
+WAVE 2 (2 items - SEQUENTIAL): Server configuration
+  - W2-008: Verify TickSystem.loop() at 60 TPS (maxSteps=4 recovery window 66.7ms)
+  - W2-009: Verify KEYFRAME_INTERVAL=128 still optimal (or update to 60)
+
+WAVE 3 (7 items - DEPENDENCY CHAIN): Client integration
+  - W3-010: Add 7 Kalman filter instances to PredictionEngine
+  - W3-011: Feed server snapshots as measurements to Kalman
+  - W3-012: Replace velocity extrapolation with Kalman.predict()
+  - W3-013: Integrate rotation Kalman into display state
+  - W3-014: Update client tickRate references to 60
+  - W3-015: Verify delta encoding still beneficial at 60 TPS
+  - W3-016: Measure bandwidth savings (target: 47-52% reduction)
+  - W3-017: Render interpolation uses Kalman state
+  - W3-018: Reconciliation logic unchanged (uses Kalman estimate vs server truth)
+
+WAVE 4 (7 items - PARALLEL TESTS): Physics & behavior verification
+  - W4-019: Test movement acceleration at 60 TPS
+  - W4-020: Test jump dynamics (height, fall speed, apex hang time)
+  - W4-021: Test crouch responsiveness
+  - W4-022: Test animation smoothness (locomotion state transitions)
+  - W4-023: Test Kalman divergence with packet loss (10%, 25%, 50%)
+  - W4-024: Test player-player collision (custom separation)
+  - W4-025: End-to-end multiplayer (3+ players, 2-3 minutes)
+
+WAVE 5 (5 items - SEQUENTIAL): Cleanup & final verification
+  - W5-026: Remove dead prediction code (old extrapolate, linear lerp)
+  - W5-027: Make Kalman Q/R configurable via world config
+  - W5-028: Remove hardcoded values, ensure < 200 lines/file
+  - W5-029: Final cleanup (no console.log, debug hooks exposed)
+  - W5-030: Final end-to-end verification (all systems integrated)
+
+KEY TECHNICAL DECISIONS
+=======================
+
+1. TICK RATE CHANGE
+   - 128 TPS (7.8ms) → 60 TPS (16.67ms)
+   - TickSystem.maxSteps=4 provides same recovery window (66.7ms)
+   - No changes to TickSystem.loop() logic needed
+
+2. KALMAN FILTER TUNING
+   Process noise (Q): player acceleration uncertainty
+   - X/Z axis: Q=0.01 (expect ~1 m/s² variation)
+   - Y axis: Q=0.02 (gravity variation, higher uncertainty)
+   
+   Measurement noise (R): snapshot accuracy
+   - All axes: R=0.001 (quantization to 0.01 units = ~0.1 unit error)
+   
+   Rotation: Q=angular accel uncertainty, R=small (rotation well-measured)
+
+3. KALMAN INTEGRATION STRATEGY
+   - Server snapshot → Kalman measurement update
+   - Kalman state → smooth estimate for rendering
+   - Between snapshots: Kalman.predict(framedt) for sub-tick interpolation
+   - Reconciliation: compare server snapshot vs Kalman estimate
+   - Packet loss recovery: Kalman continues prediction, no discontinuity
+
+4. NO CHANGES TO CORE SYSTEMS
+   - Physics engine (Jolt integration) unchanged
+   - Movement logic (Quake-style strafing) unchanged
+   - Collision detection unchanged
+   - Animation system unchanged
+   - All changes isolated to client prediction layer
+
+VERIFICATION CRITERIA (GATE CONDITIONS)
+========================================
+✓ Executed in plugin:gm:dev with real witnessed output
+✓ All scenarios tested: movement, jump, crouch, animation, collision, multiplayer, packet loss
+✓ Goal achieved: 60 TPS running, Kalman smoothing, game feel identical
+✓ No code orchestration (direct server/client execution only)
+✓ Hot reloadable (no breaking changes)
+✓ Crash-proof and self-recovering
+✓ No mocks, fakes, stubs (real physics, real network)
+✓ Cleanup complete (dead code removed)
+✓ Debug hooks exposed
+✓ Under 200 lines per file
+✓ No duplicate code
+✓ Ground truth only (witnessed execution)
+
+EXPECTED OUTCOMES
+=================
+- Server CPU load reduced ~50% (2x fewer ticks per second)
+- Network bandwidth reduced ~53% (60 snapshots vs 128 snapshots per second)
+- Game feel identical to 128 TPS (physics dynamics unchanged)
+- Client rendering smooth 60 FPS or higher (Kalman prediction between ticks)
+- Multiplayer experience improved on slower networks
+- Crouch, jumping, movement acceleration feel same as baseline
+
+IMPLEMENTATION SEQUENCE
+=======================
+1. Wave 1 (parallel): Build all Kalman utilities (2-3 hours)
+2. Wave 2 (sequential): Configure server (30 minutes)
+3. Wave 3 (dependency chain): Integrate client (2 hours)
+4. Wave 4 (parallel tests): Verify all behavior (4-5 hours)
+5. Wave 5 (sequential): Cleanup & final verification (1-2 hours)
+
+Total estimated time: 10-13 hours of focused development and testing
+
+NEXT STEP
+=========
+Execute items in Wave 1 (all 7 can run in parallel).
+Start with W1-001 (KalmanFilter1D foundation).

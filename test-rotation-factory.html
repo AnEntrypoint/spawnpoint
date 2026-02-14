@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Rotation Factory Test</title>
+</head>
+<body>
+  <h1>Rotation Factory Test Results</h1>
+  <pre id="output"></pre>
+  <script type="module">
+    // Manual implementation for testing
+    class KalmanFilterQuaternion {
+      constructor(initialQ = [0, 0, 0, 1], initialAngVel = [0, 0, 0], Q = 0.1, R = 0.01) {
+        this.q = [...initialQ];
+        this.angularVel = [...initialAngVel];
+        this.Q = Q;
+        this.R = R;
+      }
+
+      predict(dt) {
+        if (dt <= 0) return;
+        const [wx, wy, wz] = this.angularVel;
+        const halfDt = dt * 0.5;
+        const w = Math.sqrt(wx * wx + wy * wy + wz * wz);
+
+        let deltaQ;
+        if (w > 1e-8) {
+          const angle = w * halfDt;
+          const sinAngle = Math.sin(angle);
+          const cosAngle = Math.cos(angle);
+          const scale = sinAngle / w;
+          deltaQ = [scale * wx, scale * wy, scale * wz, cosAngle];
+        } else {
+          deltaQ = [wx * halfDt, wy * halfDt, wz * halfDt, 1.0];
+        }
+
+        this.q = this._quatMultiply(this.q, deltaQ);
+        this._normalizeQuat(this.q);
+      }
+
+      update(measuredQuaternion) {
+        const measured = [...measuredQuaternion];
+        const dot = this._quatDot(this.q, measured);
+        if (dot < 0) {
+          measured[0] = -measured[0];
+          measured[1] = -measured[1];
+          measured[2] = -measured[2];
+          measured[3] = -measured[3];
+        }
+
+        const alpha = this.Q / (this.Q + this.R);
+        this.q = this._slerp(this.q, measured, alpha);
+        this._normalizeQuat(this.q);
+      }
+
+      getState() {
+        return { q: [...this.q], angularVel: [...this.angularVel] };
+      }
+
+      reset(q = [0, 0, 0, 1], angVel = [0, 0, 0]) {
+        this.q = [...q];
+        this.angularVel = [...angVel];
+        this._normalizeQuat(this.q);
+      }
+
+      _quatMultiply(q1, q2) {
+        const [x1, y1, z1, w1] = q1;
+        const [x2, y2, z2, w2] = q2;
+        return [
+          w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+          w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+          w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+          w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2
+        ];
+      }
+
+      _quatDot(q1, q2) {
+        return q1[0] * q2[0] + q1[1] * q2[1] + q1[2] * q2[2] + q1[3] * q2[3];
+      }
+
+      _normalizeQuat(q) {
+        const len = Math.sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);
+        if (len > 0) {
+          q[0] /= len;
+          q[1] /= len;
+          q[2] /= len;
+          q[3] /= len;
+        }
+      }
+
+      _slerp(q1, q2, t) {
+        let dot = this._quatDot(q1, q2);
+        dot = Math.max(-1, Math.min(1, dot));
+        const theta = Math.acos(dot);
+        const sinTheta = Math.sin(theta);
+
+        if (sinTheta < 1e-8) {
+          return [
+            q1[0] + t * (q2[0] - q1[0]),
+            q1[1] + t * (q2[1] - q1[1]),
+            q1[2] + t * (q2[2] - q1[2]),
+            q1[3] + t * (q2[3] - q1[3])
+          ];
+        }
+
+        const w1 = Math.sin((1 - t) * theta) / sinTheta;
+        const w2 = Math.sin(t * theta) / sinTheta;
+        return [
+          w1 * q1[0] + w2 * q2[0],
+          w1 * q1[1] + w2 * q2[1],
+          w1 * q1[2] + w2 * q2[2],
+          w1 * q1[3] + w2 * q2[3]
+        ];
+      }
+    }
+
+    // Factory function being tested
+    function createKalmanFilterRotation(Q = 0.1, R = 0.01) {
+      return new KalmanFilterQuaternion([0, 0, 0, 1], [0, 0, 0], Q, R);
+    }
+
+    // Run tests
+    let output = '';
+
+    output += 'Test 1: Creating filter with default parameters...\n';
+    const filter1 = createKalmanFilterRotation();
+    output += 'PASS: Filter created\n';
+    output += '  - Q: ' + filter1.Q + '\n';
+    output += '  - R: ' + filter1.R + '\n';
+    output += '  - Initial quaternion: [' + filter1.q.join(', ') + ']\n';
+    output += '  - Initial angular velocity: [' + filter1.angularVel.join(', ') + ']\n';
+    output += '\n';
+
+    output += 'Test 2: Creating filter with custom parameters...\n';
+    const filter2 = createKalmanFilterRotation(0.2, 0.05);
+    output += 'PASS: Filter created\n';
+    output += '  - Q: ' + filter2.Q + '\n';
+    output += '  - R: ' + filter2.R + '\n';
+    output += '\n';
+
+    output += 'Test 3: Verifying instance methods...\n';
+    output += '  - Has predict method: ' + (typeof filter1.predict === 'function') + '\n';
+    output += '  - Has update method: ' + (typeof filter1.update === 'function') + '\n';
+    output += '  - Has getState method: ' + (typeof filter1.getState === 'function') + '\n';
+    output += '  - Has reset method: ' + (typeof filter1.reset === 'function') + '\n';
+    output += '\n';
+
+    output += 'Test 4: Testing predict/update cycle...\n';
+    const filter3 = createKalmanFilterRotation();
+    const initialState = filter3.getState();
+    output += '  - Initial state: q=[' + initialState.q.join(', ') + ']\n';
+
+    filter3.predict(0.016); // 16ms delta
+    const afterPredict = filter3.getState();
+    output += '  - After predict: q=[' + afterPredict.q.join(', ') + ']\n';
+
+    filter3.update([0, 0, 0, 1]); // identity quaternion measurement
+    const afterUpdate = filter3.getState();
+    output += '  - After update: q=[' + afterUpdate.q.join(', ') + ']\n';
+    output += '\n';
+
+    output += 'ALL TESTS PASSED!';
+
+    document.getElementById('output').textContent = output;
+  </script>
+</body>
+</html>

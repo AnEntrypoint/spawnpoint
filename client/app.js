@@ -859,16 +859,6 @@ function renderAppUI(state) {
 const client = new PhysicsNetworkClient({
   url: `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`,
   onStateUpdate: (state) => {
-    for (const p of state.players) {
-      if (!playerMeshes.has(p.id)) createPlayerVRM(p.id)
-      const mesh = playerMeshes.get(p.id)
-      const feetOff = mesh?.userData?.feetOffset ?? 1.3
-      const tx = p.position[0], ty = p.position[1] - feetOff, tz = p.position[2]
-      playerTargets.set(p.id, { x: tx, y: ty, z: tz })
-      playerStates.set(p.id, p)
-      const dx = tx - mesh.position.x, dy = ty - mesh.position.y, dz = tz - mesh.position.z
-      if (!mesh.userData.initialized || dx * dx + dy * dy + dz * dz > 100) { mesh.position.set(tx, ty, tz); mesh.userData.initialized = true }
-    }
     for (const e of state.entities) {
       const mesh = entityMeshes.get(e.id)
       if (mesh && e.position) mesh.position.set(...e.position)
@@ -877,6 +867,18 @@ const client = new PhysicsNetworkClient({
     }
     latestState = state
     if (!firstSnapshotReceived) { firstSnapshotReceived = true; checkAllLoaded() }
+  },
+  onRender: (displayStates) => {
+    for (const [playerId, displayState] of displayStates) {
+      if (!playerMeshes.has(playerId)) createPlayerVRM(playerId)
+      const mesh = playerMeshes.get(playerId)
+      const feetOff = mesh?.userData?.feetOffset ?? 1.3
+      const tx = displayState.position[0], ty = displayState.position[1] - feetOff, tz = displayState.position[2]
+      playerTargets.set(playerId, { x: tx, y: ty, z: tz })
+      playerStates.set(playerId, displayState)
+      const dx = tx - mesh.position.x, dy = ty - mesh.position.y, dz = tz - mesh.position.z
+      if (!mesh.userData.initialized || dx * dx + dy * dy + dz * dz > 100) { mesh.position.set(tx, ty, tz); mesh.userData.initialized = true }
+    }
   },
   onPlayerJoined: (id) => { if (!playerMeshes.has(id)) createPlayerVRM(id) },
   onPlayerLeft: (id) => removePlayerMesh(id),
